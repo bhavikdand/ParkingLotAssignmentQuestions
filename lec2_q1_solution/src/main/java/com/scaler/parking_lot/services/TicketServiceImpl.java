@@ -31,6 +31,29 @@ public class TicketServiceImpl implements TicketService{
 
     @Override
     public Ticket generateTicket(int gateId, String registrationNumber, String vehicleType) throws InvalidGateException, InvalidParkingLotException, ParkingSpotNotAvailableException {
-        return null;
+        Optional<Gate> optionalGate = this.gateRepository.findById(gateId);
+        if (optionalGate.isEmpty()) {
+            throw new InvalidGateException("Invalid gate id");
+        }
+        Gate gate = optionalGate.get();
+        if(gate.getType().equals(GateType.EXIT)) {
+            throw new InvalidGateException("Vehicle trying to enter from exit gate");
+        }
+
+        Vehicle vehicle = vehicleService.getOrInsertIfNotExists(registrationNumber, VehicleType.valueOf(vehicleType));
+
+        Optional<ParkingLot> parkingLotOptional = this.parkingLotRepository.getParkingLotByGateId(gateId);
+        if (parkingLotOptional.isEmpty()) {
+            throw new InvalidParkingLotException("Invalid parking lot id");
+        }
+        ParkingLot parkingLot = parkingLotOptional.get();
+
+        Optional<ParkingSpot> parkingSpotOptional = spotAssignmentStrategy.assignSpot(parkingLot, VehicleType.valueOf(vehicleType));
+        if (parkingSpotOptional.isEmpty()) {
+            throw new ParkingSpotNotAvailableException("No parking spot available");
+        }
+        ParkingSpot parkingSpot = parkingSpotOptional.get();
+
+        return this.ticketRepository.save(vehicle, new Date(), parkingSpot, gate, gate.getParkingAttendant());
     }
 }

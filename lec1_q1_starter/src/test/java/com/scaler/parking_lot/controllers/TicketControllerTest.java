@@ -6,102 +6,212 @@ import com.scaler.parking_lot.dtos.ResponseStatus;
 import com.scaler.parking_lot.models.*;
 import com.scaler.parking_lot.respositories.*;
 import com.scaler.parking_lot.services.TicketService;
-import com.scaler.parking_lot.services.TicketServiceImpl;
-import com.scaler.parking_lot.services.VehicleService;
-import com.scaler.parking_lot.services.VehicleServiceImpl;
-import com.scaler.parking_lot.strategies.EqualDistributionAssignmentStrategy;
-import com.scaler.parking_lot.strategies.SpotAssignmentStrategy;
+import com.scaler.parking_lot.strategies.assignment.SpotAssignmentStrategy;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.reflections.Reflections;
+import org.reflections.scanners.SubTypesScanner;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.lang.reflect.Constructor;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TicketControllerTest {
 
-    GateRepository gateRepository;
-    VehicleRepository vehicleRepository;
-    SpotAssignmentStrategy spotAssignmentStrategy;
-    ParkingLotRepository parkingLotRepository;
-    TicketRepository ticketRepository;
-    VehicleService vehicleService;
-    TicketService ticketService;
-    TicketController ticketController;
+    private GateRepository gateRepository;
+    private VehicleRepository vehicleRepository;
+    private SpotAssignmentStrategy spotAssignmentStrategy;
+    private ParkingLotRepository parkingLotRepository;
+    private TicketRepository ticketRepository;
+    private TicketService ticketService;
+    private TicketController ticketController;
 
+    @BeforeEach
+    public void setupTest() throws Exception {
+        initializeComponents();
+    }
+
+    private void initializeComponents() throws Exception {
+        initializeRepositories();
+        initializeSpotAssignmentStrategy();
+        initializeTicketService();
+        initializeTicketController();
+    }
+
+    private <T> T createInstance(Class<T> interfaceClass, Reflections reflections) throws Exception {
+        Set<Class<? extends T>> implementations = reflections.getSubTypesOf(interfaceClass);
+        if (implementations.isEmpty()) {
+            throw new Exception("No implementation for " + interfaceClass.getSimpleName() + " found");
+        }
+
+        Class<? extends T> implementationClass = implementations.iterator().next();
+        Constructor<? extends T> constructor = implementationClass.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        return constructor.newInstance();
+    }
+
+    private <T> T createInstanceWithArgs(Class<T> interfaceClass, Reflections reflections, List<Object> dependencies) throws Exception {
+        Set<Class<? extends T>> implementations = reflections.getSubTypesOf(interfaceClass);
+        if (implementations.isEmpty()) {
+            throw new Exception("No implementation for " + interfaceClass.getSimpleName() + " found");
+        }
+        Class<? extends T> implementationClass = implementations.iterator().next();
+        Constructor<?>[] constructors = implementationClass.getConstructors();
+        Constructor<?> constructor = Arrays.stream(constructors)
+                .filter(constructor1 -> constructor1.getParameterCount() == dependencies.size())
+                .findFirst().orElseThrow(() -> new Exception("No constructor with " + dependencies.size() + " arguments found"));
+        constructor.setAccessible(true);
+        Object[] args = new Object[constructor.getParameterCount()];
+        for (int i = 0; i < constructor.getParameterCount(); i++) {
+            for (Object dependency : dependencies) {
+                if (constructor.getParameterTypes()[i].isInstance(dependency)) {
+                    args[i] = dependency;
+                    break;
+                }
+            }
+        }
+        return (T) constructor.newInstance(args);
+    }
+
+    private void initializeRepositories() throws Exception {
+        Reflections repositoryReflections = new Reflections(TicketRepository.class.getPackageName(), new SubTypesScanner(false));
+        this.gateRepository = createInstance(GateRepository.class, repositoryReflections);
+        this.vehicleRepository = createInstance(VehicleRepository.class, repositoryReflections);
+        this.parkingLotRepository = createInstance(ParkingLotRepository.class, repositoryReflections);
+        this.ticketRepository = createInstance(TicketRepository.class, repositoryReflections);
+    }
+
+    private void initializeSpotAssignmentStrategy() throws Exception {
+        Reflections strategyReflections = new Reflections(SpotAssignmentStrategy.class.getPackageName(), new SubTypesScanner(false));
+        this.spotAssignmentStrategy = createInstance(SpotAssignmentStrategy.class, strategyReflections);
+    }
+
+    private void initializeTicketService() throws Exception {
+        Reflections serviceReflections = new Reflections(TicketService.class.getPackageName(), new SubTypesScanner(false));
+        this.ticketService = createInstanceWithArgs(TicketService.class, serviceReflections, Arrays.asList(this.gateRepository, this.vehicleRepository, this.spotAssignmentStrategy, this.parkingLotRepository, this.ticketRepository));
+    }
+
+    private void initializeTicketController() {
+        this.ticketController = new TicketController(this.ticketService);
+    }
     @Test
     public void testIssueTicketWith1AvailableParkingSpot() {
-        setupTest(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
-        GenerateTicketResponseDto responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1234", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        insertDummyData(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
+        GenerateTicketRequestDto requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1234");
+        requestDto.setVehicleType("CAR");
+        GenerateTicketResponseDto responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket());
     }
 
     @Test
     public void testIssueTicketWith2AvailableParkingSpots() {
-        setupTest(1, Map.of(VehicleType.CAR, 2), 1, 1, "Bangalore");
-        GenerateTicketResponseDto responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1234", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        insertDummyData(1, Map.of(VehicleType.CAR, 2), 1, 1, "Bangalore");
+        GenerateTicketRequestDto requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1234");
+        requestDto.setVehicleType("CAR");
+        GenerateTicketResponseDto responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket());
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1235", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1235");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket());
     }
 
     @Test
     public void testIssueTicketWithNoAvailableSpots(){
-        setupTest(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
-        GenerateTicketResponseDto responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1234", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        insertDummyData(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
+        GenerateTicketRequestDto requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1234");
+        requestDto.setVehicleType("CAR");
+        GenerateTicketResponseDto responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket());
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1235", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.FAILURE);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1235");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.FAILURE);
         assertNull(responseDto.getTicket());
     }
 
     @Test
     public void testIssueTicketWithFromExitGate(){
-        setupTest(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
-        GenerateTicketResponseDto responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(2, "KA-01-HH-1234", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.FAILURE);
+        insertDummyData(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
+        GenerateTicketRequestDto requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(2);
+        requestDto.setRegistrationNumber("KA-01-HH-1234");
+        requestDto.setVehicleType("CAR");
+        GenerateTicketResponseDto responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.FAILURE);
         assertNull(responseDto.getTicket());
     }
 
     @Test
     public void testIssueTicketFromNonExistingGate(){
-        setupTest(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
-        GenerateTicketResponseDto responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(3, "KA-01-HH-1234", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.FAILURE);
+        insertDummyData(1, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
+        GenerateTicketRequestDto requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(3);
+        requestDto.setRegistrationNumber("KA-01-HH-1234");
+        requestDto.setVehicleType("CAR");
+        GenerateTicketResponseDto responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.FAILURE);
         assertNull(responseDto.getTicket());
     }
 
     @Test
     public void testIssueTicketWith3Floors2CarsOn1stAnd2ndFloorAnd1On3rdFloor(){
-        setupTest(3, Map.of(VehicleType.CAR, 2), 1, 1, "Bangalore");
-        GenerateTicketResponseDto responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1234", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        insertDummyData(3, Map.of(VehicleType.CAR, 2), 1, 1, "Bangalore");
+        GenerateTicketRequestDto requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1234");
+        requestDto.setVehicleType("CAR");
+        GenerateTicketResponseDto responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); // Lead to 1st floor
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1235", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1235");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); //Lead to 2nd floor
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1236", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1236");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); //Lead to 3rd floor
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1237", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1237");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); //Lead to 1st floor
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1238", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1238");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); //Lead to 2nd floor
 
         Optional<ParkingLot> parkingLotOptional = parkingLotRepository.getParkingLotById(1);
@@ -116,8 +226,12 @@ public class TicketControllerTest {
         }
         assertEquals(count, 1);
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1239", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1239");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); //Lead to 3rd floor
 
 
@@ -136,40 +250,41 @@ public class TicketControllerTest {
 
     @Test
     public void testIssueWithWith1FloorUnderMaintenance(){
-        setupTest(3, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
+        insertDummyData(3, Map.of(VehicleType.CAR, 1), 1, 1, "Bangalore");
         Optional<ParkingLot> parkingLotOptional = parkingLotRepository.getParkingLotById(1);
         ParkingLot parkingLot = parkingLotOptional.get();
         ParkingFloor parkingFloor = parkingLot.getParkingFloors().stream().filter(floor -> floor.getId() == 2).findFirst().get();
         parkingFloor.setStatus(FloorStatus.UNDER_MAINTENANCE);
-        GenerateTicketResponseDto responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1234", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        GenerateTicketRequestDto requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1234");
+        requestDto.setVehicleType("CAR");
+        GenerateTicketResponseDto responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); // Lead to 1st floor
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1235", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.SUCCESS);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1235");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.SUCCESS);
         assertNotNull(responseDto.getTicket()); //Lead to 3rd floor
 
-        responseDto = ticketController.generateTicket(new GenerateTicketRequestDto(1, "KA-01-HH-1235", "CAR"));
-        assertEquals(responseDto.getResponse().getResponseStatus(), ResponseStatus.FAILURE);
+        requestDto = new GenerateTicketRequestDto();
+        requestDto.setGateId(1);
+        requestDto.setRegistrationNumber("KA-01-HH-1235");
+        requestDto.setVehicleType("CAR");
+        responseDto = ticketController.generateTicket(requestDto);
+        assertEquals(responseDto.getResponseStatus(), ResponseStatus.FAILURE);
         assertNull(responseDto.getTicket());
     }
 
-
-
-    public void setupTest(int numOfFloors, Map<VehicleType, Integer> numOfSpotsPerVehicleTypePerFloor, int numOfEntryGates, int numOfExitGates, String address) {
+    public void insertDummyData(int numOfFloors, Map<VehicleType, Integer> numOfSpotsPerVehicleTypePerFloor, int numOfEntryGates, int numOfExitGates, String address) {
         ParkingLot parkingLot = setupParkingLot(numOfFloors, numOfSpotsPerVehicleTypePerFloor, numOfEntryGates, numOfExitGates, address);
-        Map<Long, ParkingLot> parkingLotMap = Map.of(parkingLot.getId(), parkingLot);
-        Map<Long,Gate> gateMap = parkingLot.getGates().stream().collect(Collectors.toMap(Gate::getId, Function.identity()));
-        gateRepository = new InMemoryGateRepositoryImpl(gateMap);
-        vehicleRepository = new InMemoryVehicleRepositoryImpl();
-        spotAssignmentStrategy = new EqualDistributionAssignmentStrategy();
-        parkingLotRepository = new InMemoryParkingLotRepositoryImpl(parkingLotMap);
-        ticketRepository = new InMemoryTicketRepositoryImpl();
-        vehicleService = new VehicleServiceImpl(vehicleRepository);
-        ticketService = new TicketServiceImpl(gateRepository, vehicleService, spotAssignmentStrategy, parkingLotRepository, ticketRepository);
-        ticketController = new TicketController(ticketService);
+        parkingLotRepository.save(parkingLot);
+        parkingLot.getGates().forEach(gate -> gateRepository.save(gate));
     }
-
     public ParkingLot setupParkingLot(int numOfFloors, Map<VehicleType, Integer> numOfSpotsPerVehicleTypePerFloor, int numOfEntryGates, int numOfExitGates, String address){
         int parkingSpotId = 1;
         int parkingFloorId = 1;
@@ -179,25 +294,55 @@ public class TicketControllerTest {
             for(Map.Entry<VehicleType, Integer> entry: numOfSpotsPerVehicleTypePerFloor.entrySet()){
                 for(int j=0; j<entry.getValue(); j++){
                     parkingSpotId++;
-                    ParkingSpot parkingSpot = new ParkingSpot(parkingSpotId,parkingSpotId,  entry.getKey());
+                    ParkingSpot parkingSpot = new ParkingSpot();
+                    parkingSpot.setId(parkingSpotId);
+                    parkingSpot.setSupportedVehicleType(entry.getKey());
+                    parkingSpot.setStatus(ParkingSpotStatus.AVAILABLE);
+                    parkingSpot.setNumber(parkingSpotId);
                     spots.add(parkingSpot);
                 }
             }
-            ParkingFloor parkingFloor = new ParkingFloor(parkingFloorId++, spots, parkingFloorId-1,  FloorStatus.OPERATIONAL);
+            ParkingFloor parkingFloor = new ParkingFloor();
+            parkingFloor.setId(parkingFloorId++);
+            parkingFloor.setSpots(spots);
+            parkingFloor.setFloorNumber(parkingFloorId-1);
+            parkingFloor.setStatus(FloorStatus.OPERATIONAL);
             parkingFloors.add(parkingFloor);
         }
         List<Gate> gates = new ArrayList<>();
         int parkingAttendantId = 1;
         for(int i=0; i<numOfEntryGates; i++){
-            ParkingAttendant parkingAttendant = new ParkingAttendant(parkingAttendantId, String.valueOf(parkingAttendantId), parkingAttendantId +"@gmail.com");
-            gates.add(new Gate(parkingAttendantId, String.valueOf(parkingAttendantId), GateType.ENTRY, parkingAttendant));
+            ParkingAttendant parkingAttendant = new ParkingAttendant();
+            parkingAttendant.setId(parkingAttendantId);
+            parkingAttendant.setName(String.valueOf(parkingAttendantId));
+            parkingAttendant.setEmail(parkingAttendantId+"@gmail.com");
+            Gate gate = new Gate();
+            gate.setId(parkingAttendantId);
+            gate.setName(String.valueOf(parkingAttendantId));
+            gate.setType(GateType.ENTRY);
+            gate.setParkingAttendant(parkingAttendant);
+            gates.add(gate);
             parkingAttendantId++;
         }
         for(int i=0; i<numOfExitGates; i++){
-            ParkingAttendant parkingAttendant = new ParkingAttendant(parkingAttendantId, String.valueOf(parkingAttendantId), parkingAttendantId+"@gmail.com");
-            gates.add(new Gate(parkingAttendantId, String.valueOf(parkingAttendantId), GateType.EXIT, parkingAttendant));
+            ParkingAttendant parkingAttendant = new ParkingAttendant();
+            parkingAttendant.setId(parkingAttendantId);
+            parkingAttendant.setName(String.valueOf(parkingAttendantId));
+            parkingAttendant.setEmail(parkingAttendantId+"@gmail.com");
+            Gate gate = new Gate();
+            gate.setId(parkingAttendantId);
+            gate.setName(String.valueOf(parkingAttendantId));
+            gate.setType(GateType.EXIT);
+            gate.setParkingAttendant(parkingAttendant);
+            gates.add(gate);
             parkingAttendantId++;
         }
-        return new ParkingLot(1, parkingFloors, gates, "Test Parking Lot", address);
+        ParkingLot parkingLot = new ParkingLot();
+        parkingLot.setId(1);
+        parkingLot.setParkingFloors(parkingFloors);
+        parkingLot.setGates(gates);
+        parkingLot.setName("Test Parking Lot");
+        parkingLot.setAddress(address);
+        return parkingLot;
     }
 }

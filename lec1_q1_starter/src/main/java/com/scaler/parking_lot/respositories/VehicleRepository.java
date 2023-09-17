@@ -10,5 +10,5 @@ public interface VehicleRepository {
 
     public Optional<Vehicle> getVehicleByRegistrationNumber(String registrationNumber);
 
-    public Vehicle save(String registrationNumber, VehicleType vehicleType);
+    public Vehicle save(Vehicle vehicle);
 }

@@ -9,10 +9,7 @@ import java.util.Optional;
 public class InMemoryGateRepositoryImpl implements GateRepository {
 
     private Map<Long, Gate> gateMap;
-
-    public InMemoryGateRepositoryImpl(Map<Long, Gate> gateMap) {
-        this.gateMap = gateMap;
-    }
+    private static int id = 1;
 
     public InMemoryGateRepositoryImpl() {
         this.gateMap = new HashMap<>();
@@ -20,5 +17,14 @@ public class InMemoryGateRepositoryImpl implements GateRepository {
 
     public Optional<Gate> findById(long gateId) {
         return Optional.ofNullable(gateMap.get(gateId));
+    }
+
+    @Override
+    public Gate save(Gate gate) {
+        if(gate.getId() == 0){
+            gate.setId(id++);
+        }
+        gateMap.put(gate.getId(), gate);
+        return gate;
     }
 }

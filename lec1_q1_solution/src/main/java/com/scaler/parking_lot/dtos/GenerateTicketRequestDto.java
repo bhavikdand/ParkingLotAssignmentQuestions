@@ -5,12 +5,6 @@ public class GenerateTicketRequestDto {
     private String registrationNumber;
     private String vehicleType;
 
-    public GenerateTicketRequestDto(int gateId, String registrationNumber, String vehicleType) {
-        this.gateId = gateId;
-        this.registrationNumber = registrationNumber;
-        this.vehicleType = vehicleType;
-    }
-
     public int getGateId() {
         return gateId;
     }
@@ -21,5 +15,17 @@ public class GenerateTicketRequestDto {
 
     public String getVehicleType() {
         return vehicleType;
+    }
+
+    public void setGateId(int gateId) {
+        this.gateId = gateId;
+    }
+
+    public void setRegistrationNumber(String registrationNumber) {
+        this.registrationNumber = registrationNumber;
+    }
+
+    public void setVehicleType(String vehicleType) {
+        this.vehicleType = vehicleType;
     }
 }

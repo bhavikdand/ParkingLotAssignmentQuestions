@@ -1,4 +1,4 @@
-package com.scaler.parking_lot.strategies;
+package com.scaler.parking_lot.strategies.assignment;
 
 import com.scaler.parking_lot.models.*;
 

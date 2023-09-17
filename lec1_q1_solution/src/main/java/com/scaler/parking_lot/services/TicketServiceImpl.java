@@ -5,25 +5,20 @@ import com.scaler.parking_lot.exceptions.ParkingSpotNotAvailableException;
 import com.scaler.parking_lot.models.*;
 import com.scaler.parking_lot.respositories.*;
 import com.scaler.parking_lot.exceptions.InvalidGateException;
-import com.scaler.parking_lot.strategies.SpotAssignmentStrategy;
+import com.scaler.parking_lot.strategies.assignment.SpotAssignmentStrategy;
 
 import java.util.Date;
 import java.util.Optional;
 
 public class TicketServiceImpl implements TicketService{
     private GateRepository gateRepository;
-
-    private VehicleService vehicleService;
-
+    private VehicleRepository vehicleRepository;
     private SpotAssignmentStrategy spotAssignmentStrategy;
-
     private ParkingLotRepository parkingLotRepository;
-
     private TicketRepository ticketRepository;
-
-    public TicketServiceImpl(GateRepository gateRepository, VehicleService vehicleService, SpotAssignmentStrategy spotAssignmentStrategy, ParkingLotRepository parkingLotRepository, TicketRepository ticketRepository) {
+    public TicketServiceImpl(GateRepository gateRepository, VehicleRepository vehicleRepository, SpotAssignmentStrategy spotAssignmentStrategy, ParkingLotRepository parkingLotRepository, TicketRepository ticketRepository) {
         this.gateRepository = gateRepository;
-        this.vehicleService = vehicleService;
+        this.vehicleRepository = vehicleRepository;
         this.spotAssignmentStrategy = spotAssignmentStrategy;
         this.parkingLotRepository = parkingLotRepository;
         this.ticketRepository = ticketRepository;
@@ -40,7 +35,16 @@ public class TicketServiceImpl implements TicketService{
             throw new InvalidGateException("Vehicle trying to enter from exit gate");
         }
 
-        Vehicle vehicle = vehicleService.getOrInsertIfNotExists(registrationNumber, VehicleType.valueOf(vehicleType));
+        Vehicle vehicle;
+        Optional<Vehicle> optionalVehicle = vehicleRepository.getVehicleByRegistrationNumber(registrationNumber);
+        if (optionalVehicle.isEmpty()) {
+            vehicle = new Vehicle();
+            vehicle.setRegistrationNumber(registrationNumber);
+            vehicle.setVehicleType(VehicleType.valueOf(vehicleType));
+            vehicle = vehicleRepository.save(vehicle);
+        } else {
+            vehicle = optionalVehicle.get();
+        }
 
         Optional<ParkingLot> parkingLotOptional = this.parkingLotRepository.getParkingLotByGateId(gateId);
         if (parkingLotOptional.isEmpty()) {
@@ -54,6 +58,12 @@ public class TicketServiceImpl implements TicketService{
         }
         ParkingSpot parkingSpot = parkingSpotOptional.get();
 
-        return this.ticketRepository.save(vehicle, new Date(), parkingSpot, gate, gate.getParkingAttendant());
+        Ticket ticket = new Ticket();
+        ticket.setVehicle(vehicle);
+        ticket.setEntryTime(new Date());
+        ticket.setParkingSpot(parkingSpot);
+        ticket.setGate(gate);
+        ticket.setParkingAttendant(gate.getParkingAttendant());
+        return this.ticketRepository.save(ticket);
     }
 }

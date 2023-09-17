@@ -12,10 +12,6 @@ public class InMemoryVehicleRepositoryImpl implements VehicleRepository{
     private Map<Long, Vehicle> vehicleMap;
     private static long id = 0;
 
-    public InMemoryVehicleRepositoryImpl(Map<Long, Vehicle> vehicleMap) {
-        this.vehicleMap = vehicleMap;
-    }
-
     public InMemoryVehicleRepositoryImpl() {
         this.vehicleMap = new HashMap<>();
     }
@@ -24,8 +20,11 @@ public class InMemoryVehicleRepositoryImpl implements VehicleRepository{
         return this.vehicleMap.values().stream().filter(vehicle -> vehicle.getRegistrationNumber().equals(registrationNumber)).findFirst();
     }
 
-    public Vehicle save(String registrationNumber, VehicleType vehicleType) {
-        Vehicle vehicle = new Vehicle(++id, registrationNumber, vehicleType);
+    @Override
+    public Vehicle save(Vehicle vehicle) {
+        if(vehicle.getId() == 0){
+            vehicle.setId(id++);
+        }
         this.vehicleMap.put(vehicle.getId(), vehicle);
         return vehicle;
     }

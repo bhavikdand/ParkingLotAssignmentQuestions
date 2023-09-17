@@ -9,10 +9,7 @@ import java.util.Optional;
 public class InMemoryParkingLotRepositoryImpl implements ParkingLotRepository{
 
     private Map<Long, ParkingLot> parkingLotMap;
-
-    public InMemoryParkingLotRepositoryImpl(Map<Long, ParkingLot> parkingLotMap) {
-        this.parkingLotMap = parkingLotMap;
-    }
+    private static int id = 1;
 
     public InMemoryParkingLotRepositoryImpl() {
         this.parkingLotMap = new HashMap<>();
@@ -24,5 +21,14 @@ public class InMemoryParkingLotRepositoryImpl implements ParkingLotRepository{
 
     public Optional<ParkingLot> getParkingLotById(long id) {
         return Optional.ofNullable(this.parkingLotMap.get(id));
+    }
+
+    @Override
+    public ParkingLot save(ParkingLot parkingLot) {
+        if(parkingLot.getId() == 0) {
+            parkingLot.setId(id++);
+        }
+        this.parkingLotMap.put(parkingLot.getId(), parkingLot);
+        return parkingLot;
     }
 }

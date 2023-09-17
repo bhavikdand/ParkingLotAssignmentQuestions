@@ -19,10 +19,10 @@ public class InMemoryParkingLotRepositoryImpl implements ParkingLotRepository{
     }
 
     public Optional<ParkingLot> getParkingLotByGateId(long gateId) {
-        return Optional.empty();
+        return this.parkingLotMap.values().stream().filter(parkingLot -> parkingLot.getGates().stream().anyMatch(gate -> gate.getId() == gateId)).findFirst();
     }
 
     public Optional<ParkingLot> getParkingLotById(long id) {
-        return Optional.empty();
+        return Optional.ofNullable(this.parkingLotMap.get(id));
     }
 }

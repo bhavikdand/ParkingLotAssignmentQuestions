@@ -7,11 +7,6 @@ public class BaseModel {
     private Date createdAt;
     private Date updatedAt;
 
-    public BaseModel(long id) {
-        this.id = id;
-        this.createdAt = new Date();
-        this.updatedAt = new Date();
-    }
 
     public long getId() {
         return id;
@@ -23,5 +18,8 @@ public class BaseModel {
 
     public Date getUpdatedAt() {
         return updatedAt;
+    }
+    public void setId(long id) {
+        this.id = id;
     }
 }

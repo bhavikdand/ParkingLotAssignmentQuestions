@@ -19,6 +19,6 @@ public class InMemoryGateRepositoryImpl implements GateRepository {
     }
 
     public Optional<Gate> findById(long gateId) {
-        return Optional.empty();
+        return Optional.ofNullable(gateMap.get(gateId));
     }
 }

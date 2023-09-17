@@ -8,6 +8,7 @@ import java.util.Map;
 
 public class InMemoryTicketRepositoryImpl implements TicketRepository{
     private Map<Long, Ticket> ticketMap;
+    private static int id = 0;
 
     public InMemoryTicketRepositoryImpl(Map<Long, Ticket> ticketMap) {
         this.ticketMap = ticketMap;
@@ -18,7 +19,9 @@ public class InMemoryTicketRepositoryImpl implements TicketRepository{
     }
 
     public Ticket save(Vehicle vehicle, Date entryTime, ParkingSpot parkingSpot, Gate gate, ParkingAttendant parkingAttendant) {
-        return null;
+        Ticket ticket = new Ticket(++id, vehicle, entryTime, parkingSpot, gate, parkingAttendant);
+        this.ticketMap.put(ticket.getId(), ticket);
+        return ticket;
     }
 
 }

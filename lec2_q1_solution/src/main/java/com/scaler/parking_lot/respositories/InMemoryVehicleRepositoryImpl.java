@@ -10,6 +10,7 @@ import java.util.Optional;
 public class InMemoryVehicleRepositoryImpl implements VehicleRepository{
 
     private Map<Long, Vehicle> vehicleMap;
+    private static long id = 0;
 
     public InMemoryVehicleRepositoryImpl(Map<Long, Vehicle> vehicleMap) {
         this.vehicleMap = vehicleMap;
@@ -20,10 +21,12 @@ public class InMemoryVehicleRepositoryImpl implements VehicleRepository{
     }
 
     public Optional<Vehicle> getVehicleByRegistrationNumber(String registrationNumber) {
-        return Optional.empty();
+        return this.vehicleMap.values().stream().filter(vehicle -> vehicle.getRegistrationNumber().equals(registrationNumber)).findFirst();
     }
 
     public Vehicle save(String registrationNumber, VehicleType vehicleType) {
-        return null;
+        Vehicle vehicle = new Vehicle(++id, registrationNumber, vehicleType);
+        this.vehicleMap.put(vehicle.getId(), vehicle);
+        return vehicle;
     }
 }

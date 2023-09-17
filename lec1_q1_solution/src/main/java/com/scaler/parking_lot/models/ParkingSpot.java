@@ -2,24 +2,25 @@ package com.scaler.parking_lot.models;
 
 public class ParkingSpot extends BaseModel{
 
-    private final int number;
-    private final VehicleType supportedVehicleType;
+    private int number;
+    private VehicleType supportedVehicleType;
 
     private ParkingSpotStatus status;
-
-    public ParkingSpot(int id, int number, VehicleType supportedVehicleType) {
-        super(id);
-        this.number = number;
-        this.supportedVehicleType = supportedVehicleType;
-        this.status = ParkingSpotStatus.AVAILABLE;
-    }
 
     public int getNumber() {
         return number;
     }
 
+    public void setNumber(int number) {
+        this.number = number;
+    }
+
     public VehicleType getSupportedVehicleType() {
         return supportedVehicleType;
+    }
+
+    public void setSupportedVehicleType(VehicleType supportedVehicleType) {
+        this.supportedVehicleType = supportedVehicleType;
     }
 
     public ParkingSpotStatus getStatus() {

@@ -10,4 +10,6 @@ public interface ParkingLotRepository {
     public Optional<ParkingLot> getParkingLotByGateId(long gateId);
 
     public Optional<ParkingLot> getParkingLotById(long id);
+
+    public ParkingLot save(ParkingLot parkingLot);
 }

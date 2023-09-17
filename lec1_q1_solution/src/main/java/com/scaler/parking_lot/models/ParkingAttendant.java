@@ -2,12 +2,23 @@ package com.scaler.parking_lot.models;
 
 public class ParkingAttendant extends BaseModel{
 
-    public ParkingAttendant(int id, String name, String email) {
-        super(id);
-        this.name = name;
-        this.email = email;
-    }
-
     private String name;
     private String email;
+
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
 }

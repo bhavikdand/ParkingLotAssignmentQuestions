@@ -2,30 +2,25 @@ package com.scaler.parking_lot.models;
 
 public class Gate extends BaseModel{
 
-    private final String name;
-    private final GateType type;
-
+    private String name;
+    private GateType type;
     private ParkingAttendant parkingAttendant;
 
-    public Gate(long id, String name, GateType type) {
-        super(id);
-        this.name = name;
-        this.type = type;
-    }
-
-    public Gate(long id, String name, GateType type, ParkingAttendant parkingAttendant) {
-        super(id);
-        this.name = name;
-        this.type = type;
-        this.parkingAttendant = parkingAttendant;
-    }
 
     public String getName() {
         return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public GateType getType() {
         return type;
+    }
+
+    public void setType(GateType type) {
+        this.type = type;
     }
 
     public ParkingAttendant getParkingAttendant() {
